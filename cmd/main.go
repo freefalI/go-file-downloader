@@ -2,19 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/olekukonko/tablewriter"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
 
 type File struct {
-	ID            int       `json:"id"`
-	URL           string    `json:"url"`
-	Name          string    `json:"name"`
-	StartedAt     time.Time `json:"started_at"`
-	FinishedAt    time.Time `json:"finished_at"`
-	Progress      int       `json:"progress"`
+	ID         int       `json:"id"`
+	URL        string    `json:"url"`
+	Name       string    `json:"name"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at"`
+	Progress   int       `json:"progress"`
 }
 
 var (
@@ -55,11 +58,11 @@ func addFile(w http.ResponseWriter, r *http.Request) {
 
 	// Create a new File entry
 	file := File{
-		ID:            nextID,
-		URL:           newFile.URL,
-		Name:          "",
-		StartedAt:     time.Now(),
-		Progress:      0,
+		ID:        nextID,
+		URL:       newFile.URL,
+		Name:      "",
+		StartedAt: time.Now(),
+		Progress:  0,
 	}
 
 	// Increment the next ID for future entries
@@ -75,12 +78,57 @@ func addFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/files", getFiles)    
-	http.HandleFunc("/files/add", addFile) 
+	http.HandleFunc("/files", getFiles)
+	http.HandleFunc("/files/add", addFile)
 
 	log.Println("Server is running on port :8080")
+
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	table := setupTable()
+
+	// Start a goroutine to print progress
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				printEntries(table)
+			}
+		}
+	}()
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatalf("Could not start server: %s\n", err)
 	}
+}
+
+func setupTable() *tablewriter.Table {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"#", "URL", "Name", "Started at", "Finished at", "Progress"})
+	table.SetBorder(true)
+
+	return table
+}
+
+func printEntries(table *tablewriter.Table) {
+	table.ClearRows()
+
+	for _, file := range files {
+		table.Append([]string{
+			fmt.Sprintf("%d", file.ID),
+			file.URL,
+			file.Name,
+			file.StartedAt.Format(time.RFC1123),
+			file.FinishedAt.Format(time.RFC1123),
+			fmt.Sprintf("%d%%", file.Progress),
+		})
+	}
+
+	clearTerminal()
+	table.Render()
+}
+
+func clearTerminal() {
+	os.Stdout.WriteString("\033[H\033[2J")
 }

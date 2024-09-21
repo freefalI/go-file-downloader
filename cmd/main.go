@@ -17,18 +17,19 @@ import (
 )
 
 type File struct {
-	ID         int       `json:"id"`
-	URL        string    `json:"url"`
-	Name       string    `json:"name"`
-	StartedAt  time.Time `json:"started_at"`
-	FinishedAt time.Time `json:"finished_at"`
-	Progress   int       `json:"progress"`
-	Size       int       `json:"size"` //in MB
-	IsDone     bool      `json:"is_done"`
+	ID         int        `json:"id"`
+	URL        string     `json:"url"`
+	Name       string     `json:"name"`
+	StartedAt  time.Time  `json:"started_at"`
+	FinishedAt time.Time  `json:"finished_at"`
+	Progress   int        `json:"progress"`
+	Size       int        `json:"size"` //in MB
+	IsDone     bool       `json:"is_done"`
+	mu         sync.Mutex // Mutex for this specific file
 }
 
 var (
-	mu    sync.Mutex
+	mu    sync.Mutex // Controls read and writes to files
 	files = []*File{
 		// {1, "http://", "nam", time.Now(), time.Now().Add(time.Minute), 20},
 	}
@@ -130,7 +131,11 @@ func setupTable() *tablewriter.Table {
 func printEntries(table *tablewriter.Table) {
 	table.ClearRows()
 
+	mu.Lock() // Lock around reading files
+	defer mu.Unlock()
+
 	for _, file := range files {
+		file.mu.Lock()
 		var finishedAt string
 		if !file.FinishedAt.IsZero() {
 			finishedAt = file.FinishedAt.Format(time.DateTime)
@@ -146,6 +151,7 @@ func printEntries(table *tablewriter.Table) {
 			fmt.Sprintf("%d%%", file.Progress),
 			fmt.Sprintf("%t", file.IsDone),
 		})
+		file.mu.Unlock()
 	}
 
 	clearTerminal()
@@ -184,7 +190,9 @@ func downloadFile(fileObject *File) {
 
 	// Create the file
 	fileName := strconv.Itoa(fileObject.ID) + "-" + path.Base(response.Request.URL.Path)
+	fileObject.mu.Lock()
 	fileObject.Name = fileName
+	fileObject.mu.Unlock()
 	filePath := filepath.Join(downloadDir, fileName)
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -203,7 +211,9 @@ func downloadFile(fileObject *File) {
 	buffer := make([]byte, 32*1024) // 32 KB buffer
 
 	if sizeKnown {
+		fileObject.mu.Lock()
 		fileObject.Size = int(totalBytes) / 1024 / 1024
+		fileObject.mu.Unlock()
 	}
 	// Download the file
 	for {
@@ -226,15 +236,19 @@ func downloadFile(fileObject *File) {
 
 		// Update the downloaded bytes count
 		downloadedBytes += int64(bytesRead)
-		if !sizeKnown {
-			fileObject.Size = int(downloadedBytes) / 1024 / 1024
-		}
+
+		fileObject.mu.Lock()
 		if sizeKnown {
 			fileObject.Progress = int(float64(downloadedBytes) / float64(totalBytes) * 100)
+		} else {
+			fileObject.Size = int(downloadedBytes) / 1024 / 1024 //to MB
 		}
+		fileObject.mu.Unlock()
 	}
+	fileObject.mu.Lock()
 	fileObject.IsDone = true
 	fileObject.FinishedAt = time.Now()
+	fileObject.mu.Unlock()
 
 	fmt.Printf("\nDownloaded file: %s\n", filePath)
 }

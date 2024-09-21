@@ -4,6 +4,10 @@
 
 This project is a simple file downloader implemented in Go. It allows users to add files for download via an HTTP API and tracks the progress of each download.
 
+## Demo
+
+![Demo](demo.gif)
+
 ## Features
 
 - **HTTP API**: 

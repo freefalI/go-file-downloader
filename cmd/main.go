@@ -3,15 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/olekukonko/tablewriter"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
+
+	"github.com/olekukonko/tablewriter"
 )
 
 type File struct {
@@ -21,7 +23,7 @@ type File struct {
 	StartedAt  time.Time `json:"started_at"`
 	FinishedAt time.Time `json:"finished_at"`
 	Progress   int       `json:"progress"`
-	Size       int       `json:"size"`
+	Size       int       `json:"size"` //in MB
 	IsDone     bool      `json:"is_done"`
 }
 
@@ -135,7 +137,7 @@ func printEntries(table *tablewriter.Table) {
 		}
 
 		table.Append([]string{
-			fmt.Sprintf("%d", file.ID),
+			strconv.Itoa(file.ID),
 			file.URL,
 			file.Name,
 			file.StartedAt.Format(time.DateTime),
@@ -181,7 +183,7 @@ func downloadFile(fileObject *File) {
 	}
 
 	// Create the file
-	fileName := path.Base(response.Request.URL.Path)
+	fileName := strconv.Itoa(fileObject.ID) + "-" + path.Base(response.Request.URL.Path)
 	fileObject.Name = fileName
 	filePath := filepath.Join(downloadDir, fileName)
 	file, err := os.Create(filePath)
@@ -233,6 +235,6 @@ func downloadFile(fileObject *File) {
 	}
 	fileObject.IsDone = true
 	fileObject.FinishedAt = time.Now()
-	
+
 	fmt.Printf("\nDownloaded file: %s\n", filePath)
 }

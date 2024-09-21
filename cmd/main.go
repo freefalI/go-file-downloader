@@ -87,7 +87,8 @@ func addFile(w http.ResponseWriter, r *http.Request) {
 
 	// Process the job immediately in a goroutine
 	go downloadFile(file)
-
+	
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(file)
 }

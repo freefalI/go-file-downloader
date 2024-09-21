@@ -70,13 +70,13 @@ During the development of this project, several key topics in Go were practiced:
 2. Build the application:
 
    ```bash
-   go build cmd/main.go
+   go build -o app ./src
    ```
 
 3. Run the application:
 
    ```bash
-   ./go-file-downloader
+   ./app
    ```
 
 ### Usage
